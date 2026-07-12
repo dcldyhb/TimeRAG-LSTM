@@ -433,7 +433,7 @@ After completing the user's request, but **before sending the final response**:
 - **Last reviewed:** 2026-07-12
 - **Current stage:** Stage 1 - Local Development
 - **Overall status:** In progress
-- **Latest update:** Repository synchronization completed on 2026-07-12. All 8 existing data and metric unit tests passed via `.venv/bin/python -m unittest discover -s tests -v`, and the current source, tests, documentation, editor settings, `.gitignore`, and progress instructions were pushed to GitHub `origin/main`. Local M4 datasets, caches, and `.venv` remain intentionally uncommitted because they are machine-specific or exceed normal GitHub file limits.
+- **Latest update:** All 16 files under `data/` were committed with Git LFS and pushed successfully to GitHub `origin/main` on 2026-07-12. The LFS upload completed at approximately 590 MB. Experiment-stage status remains Stage 1; the next implementation task is the plain LSTM model.
 
 ### Completed
 
@@ -442,6 +442,7 @@ After completing the user's request, but **before sending the final response**:
 - [x] Added M4 data-loading/sliding-window work in `src/data.py` with `tests/test_data.py` present.
 - [x] Documented metric concepts and data-loading progress in `steps.md`.
 - [x] Verified all 8 existing data and metric unit tests pass with `unittest` on 2026-07-12.
+- [x] Committed all 16 local M4 dataset files under `data/` using Git LFS and pushed them to GitHub.
 
 ### In Progress
 
@@ -466,6 +467,8 @@ After completing the user's request, but **before sending the final response**:
 - `tests/test_data.py`
 - `tests/test_metric.py`
 - `steps.md`
+- `data/` (16 files tracked with Git LFS)
+- `.gitattributes`
 
 ### Progress Update Rules
 
