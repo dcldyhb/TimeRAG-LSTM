@@ -1,13 +1,2 @@
-data/
-checkpoints/
-logs/
-results/
-*.pt
-*.pth
-*.npy
-*.npz
-*.csv
-__pycache__/
-.venv/
-.env
-.vscode/
+__MACOSX/
+.DS_Store

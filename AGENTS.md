@@ -395,4 +395,82 @@ After that:
 ```text
 Add DTW retrieval cache and RAG-LSTM.
 ```
+## Mandatory Progress Review and Synchronization
 
+The agent must treat the progress section in this file as persistent project memory and follow this protocol on **every user turn**.
+
+### Before Answering or Acting
+
+1. Read `AGENTS.md`, especially `## Project Progress (Agent-maintained)` and `## Current Priority`.
+2. Review relevant repository evidence (changed files, tests, results, logs, or user-provided updates) when needed to verify the actual state.
+3. Use the recorded progress to decide the next action. Do not claim that a task is complete without evidence.
+4. If the progress record conflicts with repository evidence or the user's latest message, correct the record before proceeding.
+
+### Before Sending the Final Answer
+
+After completing the user's request, but **before sending the final response**:
+
+1. Reassess the project's progress from the work completed in the current turn and any new evidence.
+2. Update `## Project Progress (Agent-maintained)` in `AGENTS.md`:
+   - update `Last reviewed` on every turn;
+   - update the current stage and status;
+   - move verified items among `Completed`, `In progress`, `Blocked`, and `Next actions`;
+   - record important decisions, generated artifacts, test outcomes, and blockers;
+   - keep `## Current Priority` consistent with the first unfinished next action.
+3. If no project progress changed, still update `Last reviewed` and state that the progress was reviewed with no status change in `Latest update`.
+4. Keep entries concise, factual, and based on evidence. Never invent test results or completion states.
+5. In the final response, briefly mention that the progress record was synchronized and summarize any status change.
+
+### Progress Status Definitions
+
+- `Not started`: no implementation evidence exists.
+- `In progress`: implementation has begun but required verification or outputs are incomplete.
+- `Blocked`: progress cannot continue without user input, missing data/access, or an external dependency.
+- `Completed`: implementation and the relevant verification have both succeeded.
+
+## Project Progress (Agent-maintained)
+
+- **Last reviewed:** 2026-07-12
+- **Current stage:** Stage 1 - Local Development
+- **Overall status:** In progress
+- **Latest update:** Progress reviewed for repository synchronization. All 8 existing data and metric unit tests passed via `.venv/bin/python -m unittest discover -s tests -v`. Source, tests, documentation, editor settings, and progress instructions are ready to commit; local M4 datasets, caches, and `.venv` remain uncommitted because they are machine-specific or exceed normal GitHub file limits.
+
+### Completed
+
+- [x] Created the initial project directory structure.
+- [x] Added initial SMAPE/MASE metric implementation in `src/metric.py` with `tests/test_metric.py` present.
+- [x] Added M4 data-loading/sliding-window work in `src/data.py` with `tests/test_data.py` present.
+- [x] Documented metric concepts and data-loading progress in `steps.md`.
+- [x] Verified all 8 existing data and metric unit tests pass with `unittest` on 2026-07-12.
+
+### In Progress
+
+- [ ] Complete the M4 Weekly data pipeline and confirm the intended train/evaluation split has no test leakage.
+
+### Blocked
+
+- None recorded.
+
+### Next Actions
+
+1. Implement the plain LSTM model in `src/models.py`.
+2. Implement the baseline training/evaluation CLI in `train.py`.
+3. Run a 100-sample, 1-2 epoch local M4 Weekly debug experiment.
+4. Confirm loss decreases and save metrics/configuration/results.
+5. After the baseline closes successfully, implement DTW retrieval cache and TimeRAG-LSTM.
+
+### Verified Artifacts
+
+- `src/data.py`
+- `src/metric.py`
+- `tests/test_data.py`
+- `tests/test_metric.py`
+- `steps.md`
+
+### Progress Update Rules
+
+- Preserve this section as the single source of truth for project status.
+- Prefer updating existing bullets over appending duplicate history.
+- Add paths to important new artifacts under `Verified Artifacts` only after confirming they exist.
+- Mark tests or experiments complete only when their command and outcome have been observed.
+- Keep detailed historical notes in `steps.md` or result/log files; keep this section focused on current state.
