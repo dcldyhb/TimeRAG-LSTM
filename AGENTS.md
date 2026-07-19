@@ -387,7 +387,7 @@ python train.py --freq Weekly --model rag_lstm --top_k 5 > logs/weekly_rag.log 2
 The next concrete goal is:
 
 ```text
-Implement and locally debug M4 Weekly LSTM baseline in WSL.
+Implement the plain LSTM model in src/models.py, then locally debug the M4 Weekly baseline in WSL.
 ```
 
 After that:
@@ -430,10 +430,10 @@ After completing the user's request, but **before sending the final response**:
 
 ## Project Progress (Agent-maintained)
 
-- **Last reviewed:** 2026-07-12
+- **Last reviewed:** 2026-07-19
 - **Current stage:** Stage 1 - Local Development
 - **Overall status:** In progress
-- **Latest update:** All 16 files under `data/` were committed with Git LFS and pushed successfully to GitHub `origin/main` on 2026-07-12. The LFS upload completed at approximately 590 MB. Experiment-stage status remains Stage 1; the next implementation task is the plain LSTM model.
+- **Latest update:** Progress reviewed again on 2026-07-19 with no status change. The inverse-standardization path was checked: `invert_standardization` restores normalized targets or forecasts with the input-derived location and scale, and is currently covered by the round-trip data test but not yet wired into training. The next code task remains the plain LSTM in `src/models.py`; model execution still requires the intended WSL environment with PyTorch.
 
 ### Completed
 
@@ -441,12 +441,13 @@ After completing the user's request, but **before sending the final response**:
 - [x] Added initial SMAPE/MASE metric implementation in `src/metric.py` with `tests/test_metric.py` present.
 - [x] Added M4 data-loading/sliding-window work in `src/data.py` with `tests/test_data.py` present.
 - [x] Documented metric concepts and data-loading progress in `steps.md`.
-- [x] Verified all 8 existing data and metric unit tests pass with `unittest` on 2026-07-12.
+- [x] Verified all 8 existing data and metric unit tests pass with `python3 -m unittest discover -s tests -v` on 2026-07-17.
 - [x] Committed all 16 local M4 dataset files under `data/` using Git LFS and pushed them to GitHub.
+- [x] Confirmed the M4 Weekly train/evaluation boundary on real data: training windows use only `train`, while evaluation uses the `train` tail as input and official `test` values as targets.
 
 ### In Progress
 
-- [ ] Complete the M4 Weekly data pipeline and confirm the intended train/evaluation split has no test leakage.
+- [ ] Implement the plain M4 Weekly LSTM model in `src/models.py`.
 
 ### Blocked
 
