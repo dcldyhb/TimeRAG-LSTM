@@ -433,7 +433,7 @@ After completing the user's request, but **before sending the final response**:
 - **Last reviewed:** 2026-07-20
 - **Current stage:** Stage 2 - Retrieval and RAG-LSTM Debug
 - **Overall status:** In progress
-- **Latest update:** Progress reviewed again on 2026-07-20 with no status change. W1-W3 diagnostics explain W3's lower error: its non-overlapping historical nearest pattern is much closer than W1/W2 (`0.149` input and `0.276` future normalized RMSE versus `0.691`/`2.848` and `0.766`/`2.518`), while W1/W2 undergo boundary regime changes. Training/evaluation boundaries and input-only normalization were rechecked with no test-leakage evidence.
+- **Latest update:** Progress reviewed again on 2026-07-20 with no status change. Rechecked the plain-LSTM state flow: `nn.LSTM` maintains hidden and cell states internally across each 26-step window, `forward()` uses the final sequence output for the 13-step forecast, and no recurrent state is carried across windows or batches; DTW retrieval remains the first unfinished action.
 
 ### Completed
 
