@@ -387,13 +387,13 @@ python train.py --freq Weekly --model rag_lstm --top_k 5 > logs/weekly_rag.log 2
 The next concrete goal is:
 
 ```text
-Implement the plain LSTM model in src/models.py, then locally debug the M4 Weekly baseline in WSL.
+Implement the Stage 2 training-only knowledge base and DTW top-k retrieval cache.
 ```
 
 After that:
 
 ```text
-Add DTW retrieval cache and RAG-LSTM.
+Implement retrieval correctness and no-leakage tests, then use the verified cache to implement and debug RAG-LSTM.
 ```
 ## Mandatory Progress Review and Synchronization
 
@@ -430,10 +430,10 @@ After completing the user's request, but **before sending the final response**:
 
 ## Project Progress (Agent-maintained)
 
-- **Last reviewed:** 2026-07-19
-- **Current stage:** Stage 1 - Local Development
+- **Last reviewed:** 2026-07-20
+- **Current stage:** Stage 2 - Retrieval and RAG-LSTM Debug
 - **Overall status:** In progress
-- **Latest update:** Progress reviewed again on 2026-07-19 with no status change. The inverse-standardization path was checked: `invert_standardization` restores normalized targets or forecasts with the input-derived location and scale, and is currently covered by the round-trip data test but not yet wired into training. The next code task remains the plain LSTM in `src/models.py`; model execution still requires the intended WSL environment with PyTorch.
+- **Latest update:** Verified the completed full 353,270-window Weekly MPS run on 2026-07-20. Loss decreased monotonically from `0.895653` to `0.720595`; LSTM achieved SMAPE `8.5460` and MASE `2.3428`, improving on persistence (`9.1613`/`2.7773`) and winning on SMAPE for 220/359 series. Metrics, predictions, plot, checkpoint, log, and TensorBoard scalar/image tags are readable; W1-W3 values were cross-checked against the source data.
 
 ### Completed
 
@@ -444,10 +444,28 @@ After completing the user's request, but **before sending the final response**:
 - [x] Verified all 8 existing data and metric unit tests pass with `python3 -m unittest discover -s tests -v` on 2026-07-17.
 - [x] Committed all 16 local M4 dataset files under `data/` using Git LFS and pushed them to GitHub.
 - [x] Confirmed the M4 Weekly train/evaluation boundary on real data: training windows use only `train`, while evaluation uses the `train` tail as input and official `test` values as targets.
+- [x] Configured and syntax-verified the Apple Silicon macOS PyTorch requirement in `requirements.txt`.
+- [x] Installed PyTorch 2.7.1 in the project Conda environment and verified all 16 unit tests pass without skips, including the end-to-end training pipeline test.
+- [x] Verified a plain LSTM forward pass produces `(8, 13)` output on the selected fallback CPU device.
+- [x] Implemented the baseline training/evaluation CLI in `train.py` with reproducible sampling, input-only standardization, batched training/inference, SMAPE/MASE evaluation, and persisted configuration/results.
+- [x] Ran `python train.py --freq Weekly --max-samples 100 --epochs 2` on CPU: loss decreased from `6.682118` to `6.647610`, prediction shape was `(359, 13)`, SMAPE was `12.1946`, and MASE was `4.9444`.
+- [x] Verified `results/weekly_lstm_metrics.json`, `results/weekly_lstm_predictions.npz`, and `checkpoints/weekly_lstm.pt` were created and readable.
+- [x] Confirmed in the user's interactive Conda terminal that `torch.backends.mps.is_built()` and `is_available()` are both `True`, and `src.config.DEVICE` is `mps`.
+- [x] Added `tensorboard` and `matplotlib` to `requirements.txt`, installed TensorBoard 2.21.0 and Matplotlib 3.11.1, and verified `pip check` reports no broken requirements.
+- [x] Added timestamped TensorBoard logging for training loss, SMAPE, MASE, configuration text, and three prediction figures, while preserving JSON/NPZ/checkpoint outputs.
+- [x] Added standalone `weekly_prediction_plot.png` generation and visually verified the real-data smoke plot is nonblank, correctly labeled, and correctly separates history from the forecast horizon.
+- [x] Extended the end-to-end training test to validate TensorBoard scalar/image tags and the PNG artifact; all 16 tests pass.
+- [x] Verified the user's interactive MPS visualization smoke run created metrics, predictions, a checkpoint, a standalone PNG, and readable TensorBoard events under the requested project directories.
+- [x] Reviewed the 10k-sample MPS run: SMAPE improved to 11.5248 and MASE to 3.9326 but remained worse than persistence (9.1613/2.7773); isolated one W10 training window as 99.9439% of total normalized-target MSE.
+- [x] Added an input-derived relative scale floor to `standardize_by_input`, preserving the input-only/no-target-statistics contract, plus a W10-like regression test.
+- [x] Replaced MSE training with configurable Smooth L1 loss and added persistence metrics/predictions to JSON, NPZ, plots, and TensorBoard.
+- [x] Verified all 17 tests pass after stabilization.
+- [x] Ran the fixed 10k-sample, 10-epoch CPU baseline: loss `1.0213 -> 0.9021`, SMAPE `8.5773`, MASE `2.3726`, beating persistence overall and on 227/359 series.
+- [x] Completed and verified the full 353,270-window, 20-epoch Weekly MPS baseline: loss `0.895653 -> 0.720595`, SMAPE `8.5460`, MASE `2.3428`, beating persistence overall and on 220/359 series by SMAPE.
 
 ### In Progress
 
-- [ ] Implement the plain M4 Weekly LSTM model in `src/models.py`.
+- None recorded.
 
 ### Blocked
 
@@ -455,21 +473,51 @@ After completing the user's request, but **before sending the final response**:
 
 ### Next Actions
 
-1. Implement the plain LSTM model in `src/models.py`.
-2. Implement the baseline training/evaluation CLI in `train.py`.
-3. Run a 100-sample, 1-2 epoch local M4 Weekly debug experiment.
-4. Confirm loss decreases and save metrics/configuration/results.
-5. After the baseline closes successfully, implement DTW retrieval cache and TimeRAG-LSTM.
+1. Implement the Stage 2 knowledge-base and DTW top-k retrieval cache in `src/retrieval.py` using training data only.
+2. Add retrieval correctness and no-leakage tests on toy data.
+3. Use the verified cache to implement and locally debug TimeRAG-LSTM.
 
 ### Verified Artifacts
 
-- `src/data.py`
+- `src/data.py` (input-only relative scale floor verified on W10-like data)
 - `src/metric.py`
+- `src/config.py` (unit tests pass; interactive-terminal MPS selection verified)
+- `src/models.py` (unit tests and CPU forward pass verified)
+- `train.py` (Smooth L1, persistence comparison, TensorBoard, and fixed 10k run verified)
 - `tests/test_data.py`
 - `tests/test_metric.py`
+- `tests/test_config.py`
+- `tests/test_models.py`
+- `tests/test_train.py` (TensorBoard scalar/image and PNG assertions pass)
+- `requirements.txt`
+- `README.md`
 - `steps.md`
 - `data/` (16 files tracked with Git LFS)
 - `.gitattributes`
+- `results/weekly_lstm_metrics.json` (100-sample, 2-epoch CPU debug run)
+- `results/weekly_lstm_predictions.npz` (verified `(359, 13)` predictions)
+- `checkpoints/weekly_lstm.pt` (verified readable checkpoint)
+- `results/weekly_mps_smoke/weekly_lstm_metrics.json` (MPS smoke result; correctness-only)
+- `results/weekly_mps_smoke/weekly_lstm_predictions.npz`
+- `results/weekly_mps_smoke/weekly_prediction_plot.png`
+- `checkpoints/weekly_mps_smoke/weekly_lstm.pt`
+- `runs/weekly_lstm_20260719-233949-824490/` (verified TensorBoard events)
+- `results/weekly_local_10k/weekly_lstm_metrics.json` (outlier-dominated MPS run; diagnostic evidence)
+- `results/weekly_local_10k/weekly_lstm_predictions.npz`
+- `results/weekly_local_10k/weekly_prediction_plot.png`
+- `checkpoints/weekly_local_10k/weekly_lstm.pt`
+- `runs/weekly_lstm_20260719-234555-948031/` (verified 10-epoch TensorBoard events)
+- `results/weekly_local_10k_fixed_cpu/weekly_lstm_metrics.json` (stabilized 10k baseline)
+- `results/weekly_local_10k_fixed_cpu/weekly_lstm_predictions.npz`
+- `results/weekly_local_10k_fixed_cpu/weekly_prediction_plot.png`
+- `checkpoints/weekly_local_10k_fixed_cpu/weekly_lstm.pt`
+- `runs_fixed_cpu/weekly_lstm_20260719-235850-519922/` (verified stabilized TensorBoard events)
+- `results/weekly_full_lstm/weekly_lstm_metrics.json` (verified full Weekly MPS metrics)
+- `results/weekly_full_lstm/weekly_lstm_predictions.npz` (verified IDs, targets, LSTM, and persistence arrays with shape `(359, 13)`)
+- `results/weekly_full_lstm/weekly_prediction_plot.png` (visually verified W1 forecast plot)
+- `checkpoints/weekly_full_lstm/weekly_lstm.pt`
+- `logs/weekly_full_lstm.log` (complete 20-epoch log)
+- `runs/weekly_full_lstm/weekly_lstm_20260720-000723-020716/` (verified full loss curve, metrics, and W1-W3 image tags)
 
 ### Progress Update Rules
 
