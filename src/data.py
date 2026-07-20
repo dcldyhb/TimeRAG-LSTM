@@ -235,14 +235,23 @@ def standardize_by_input(
     targets: np.ndarray | None = None,
     *,
     eps: float = 1e-6,
+    relative_scale_floor: float = 1e-3,
 ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray, np.ndarray]:
-    """Standardize each sample using statistics from its input window only."""
     inputs = np.asarray(inputs, dtype=np.float32)
     if inputs.ndim != 2:
         raise ValueError(f"inputs must have shape [samples, time], got {inputs.shape}")
+    if eps <= 0:
+        raise ValueError("eps must be positive")
+    if relative_scale_floor < 0:
+        raise ValueError("relative_scale_floor must be non-negative")
 
     locations = inputs.mean(axis=1, keepdims=True)
-    scales = np.maximum(inputs.std(axis=1, keepdims=True), eps)
+    input_magnitudes = np.maximum(
+        np.mean(np.abs(inputs), axis=1, keepdims=True),
+        1.0,
+    )
+    minimum_scales = np.maximum(eps, relative_scale_floor * input_magnitudes)
+    scales = np.maximum(inputs.std(axis=1, keepdims=True), minimum_scales)
     normalized_inputs = (inputs - locations) / scales
 
     normalized_targets = None
