@@ -1,3 +1,11 @@
 __MACOSX/
 .DS_Store
 __pycache__/
+results/
+.idea/
+.vscode/
+checkpoints/
+runs/
+tests/
+logs/
+runs_fixed_cpu/
