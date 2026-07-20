@@ -433,7 +433,7 @@ After completing the user's request, but **before sending the final response**:
 - **Last reviewed:** 2026-07-20
 - **Current stage:** Stage 2 - Retrieval and RAG-LSTM Debug
 - **Overall status:** In progress
-- **Latest update:** Verified the completed full 353,270-window Weekly MPS run on 2026-07-20. Loss decreased monotonically from `0.895653` to `0.720595`; LSTM achieved SMAPE `8.5460` and MASE `2.3428`, improving on persistence (`9.1613`/`2.7773`) and winning on SMAPE for 220/359 series. Metrics, predictions, plot, checkpoint, log, and TensorBoard scalar/image tags are readable; W1-W3 values were cross-checked against the source data.
+- **Latest update:** Progress reviewed again on 2026-07-20 with no status change. W1-W3 diagnostics explain W3's lower error: its non-overlapping historical nearest pattern is much closer than W1/W2 (`0.149` input and `0.276` future normalized RMSE versus `0.691`/`2.848` and `0.766`/`2.518`), while W1/W2 undergo boundary regime changes. Training/evaluation boundaries and input-only normalization were rechecked with no test-leakage evidence.
 
 ### Completed
 
