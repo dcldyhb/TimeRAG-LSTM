@@ -22,28 +22,28 @@ explicit progress-sync task, never silently during read-only work.
 
 ## Current Handoff
 
-- **Last material handoff update:** 2026-07-24 21:49 CST
+- **Last material handoff update:** 2026-07-24 22:07 CST
 - **Stage:** Stage 4 - Full M4 Weekly experiment
-- **Status:** In progress; full strict-episode cache verified, gated run next
+- **Status:** In progress; full gated-future Weekly run active on AutoDL
 - **Formal workspace:** AutoDL `/root/autodl-tmp/TimeRAG-LSTM`
   (user-provided remote state)
-- **Last run evidence:** User-provided AutoDL output verified the full cache at
-  `cache/weekly_full_gated_t025/weekly_dtw_top5_b644bb412e5f.npz`: readable
-  `(353270, 5)` training and `(359, 5)` evaluation indices/distances, all
-  distances finite, formal configuration matched, and a repeat cache-only run
-  loaded it and exited `0`. Build time was `10333.17s`; SHA-256 is
-  `eb34659ebe01ec77827478f9448c9f558ea41495653dcf1fac6eaca9b1c04347`.
-- **Recovery risk:** The verified cache is currently evidenced only in the
-  AutoDL data-disk workspace. Run the formal training under `screen`, require
-  this exact cache to load, and preserve its completion log and outputs.
+- **Last run evidence:** At 2026-07-24 22:07 CST, user-provided AutoDL output
+  showed the matched 353,270-window, 20-epoch gated-future run active in a
+  detached `screen`. It loaded the verified `b644bb412e5f` cache and reported
+  `evaluation=official_test` and `device=cuda`; the displayed command matches
+  the formal configuration.
+- **Recovery risk:** Running status is not completion evidence. Require
+  `logs/weekly_full_gated_t025_train.exit` with exit code `0`, a complete log,
+  parsed metrics/configuration, and readable required artifacts before marking
+  the experiment complete or comparing results.
 - **Blockers:** None
 
 ### Ordered Actions
 
-1. **Active:** Run and verify the matched full gated-future Weekly experiment
-   at temperature `0.25`, loading the verified `b644bb412e5f` cache. Require
-   terminal success, exact formal configuration, metrics, predictions,
-   checkpoint, completion log, and readable forecast/retrieval plots.
+1. **Active:** Monitor and verify the matched full gated-future Weekly
+   experiment at temperature `0.25`. Require terminal success, exact formal
+   configuration, metrics, predictions, checkpoint, completion log, and
+   readable forecast/retrieval plots.
 2. Compare it with the verified full plain-LSTM baseline and inspect the
    per-series error tail.
 3. If harmful MASE outliers persist, develop any adaptive gate on `train_tail`,
