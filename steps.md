@@ -196,7 +196,7 @@ conda run --no-capture-output -n TimeRAG-LSTM python train.py \
 
 `train.py` 会为每次运行创建带时间戳的独立事件目录，并记录：
 
-- `train/loss`：每个 epoch 的平均 MSE loss。
+- `train/loss`：每个 epoch 的平均 Smooth L1 loss。
 - `eval/smape` 和 `eval/mase`：官方测试集上的最终指标。
 - `baseline/persistence_smape` 和 `baseline/persistence_mase`：最后值外推基线。
 - `run/configuration`：本次运行的完整配置。
@@ -227,3 +227,104 @@ tensorboard --logdir runs --port 6006
 - LSTM 在 359 条评估序列中的 227 条上优于 persistence。
 
 相对 scale 下限仍只使用输入窗口，因此没有让目标或官方测试集参与统计量估计。
+
+## Stage 2：DTW 检索与 TimeRAG-LSTM 本地闭环
+
+`src/retrieval.py` 已实现：
+
+1. 只从训练滑窗输入构建知识库，不保存训练目标或官方测试目标。
+2. 对每个窗口独立标准化后计算精确 DTW top-k。
+3. 训练查询排除自身；同一序列排除所有与查询输入区间重叠的候选。
+4. 使用输入与元数据内容指纹校验 NPZ 缓存，防止参数或样本变化后误用旧结果。
+5. 将 query 与 top-k 检索窗口拼为 `[batch, time, top_k + 1]` 通道输入。
+
+`RAGLSTMForecaster` 复用 plain LSTM，只把输入特征数固定为
+`top_k + 1`。`train.py --model rag_lstm --top-k 5` 会保存检索缓存、检索索引与
+距离、标准化检索示例图、预测、指标、checkpoint 和 TensorBoard 日志。
+
+2026-07-20 的真实 M4 Weekly CPU smoke 使用 100 个训练窗口、top-5、2 epoch：
+
+- loss：`1.436290 -> 1.420194`。
+- SMAPE：`12.1860`。
+- MASE：`4.8831`。
+- persistence：SMAPE `9.1613`，MASE `2.7773`。
+- 第二次相同运行成功复用内容指纹一致的 DTW 缓存。
+- 真实缓存审计通过：训练查询无自身命中，训练和评估查询均无同序列窗口重叠，距离均有限。
+- 全部 25 个测试通过，包括 plain LSTM 回归和 RAG 端到端产物测试。
+
+该结果只证明 RAG 闭环正确，小样本精度尚不优于 persistence。精确全对全 DTW
+不适合直接扩展到 353,270 个 Weekly 窗口，正式实验前需要先测试规模并确定候选缩减策略。
+
+### 有界候选检索优化
+
+当前默认检索改为两阶段：
+
+1. 使用 SciPy `cKDTree` 在标准化窗口上按欧氏距离预筛 512 个候选。
+2. 按 query batch 对候选池执行向量化精确 DTW，最终保留 top-5。
+3. `exact` 模式保留为小规模 oracle，不用于全量 Weekly。
+4. 同序列候选必须在 query 输入窗口开始前结束；优化路径仍执行相同因果过滤。
+5. 缓存 key 纳入策略、候选池、SciPy/DTW/因果策略版本和全部输入内容。
+6. 缓存采用临时文件加原子替换，并在加载后复核形状、索引、距离、自身命中和因果约束。
+7. `--build-cache-only` 支持先离线构建缓存，再从同一缓存启动训练。
+8. 非数值距离缓存会作为损坏缓存拒绝；预筛选在因果过滤后候选不足时会扩展搜索范围。
+
+10k KB oracle 基准（200 个训练 query + 359 个评估 query）：
+
+- exact 总耗时：约 `19.20s`。
+- 512 候选总耗时：约 `1.85s`，约快 `10.4x`。
+- 512 候选评估 top-5 recall：`0.690`，top-1 一致率：`0.730`。
+- 1024 候选评估 top-5 recall：`0.772`，但耗时约为 512 候选的 `3.4x`。
+- 10k 完整 cache-only、batch 64：`37.76s`；batch 256 反而为 `81.28s`，因此默认 batch 为 64。
+- 50k 完整 cache-only：`227.50s`，缓存约 `1.5MB`；二次加载约 `0.012s`。
+- v2 路径最终本地回归为 31 个测试全部通过，当时的 50k 缓存也成功重新加载并通过因果校验；后续 gated-future 的 v3 完整 episode 规则会有意使该旧缓存失效。
+
+匹配的 10k、10 epoch CPU 对照：
+
+- plain LSTM：SMAPE `8.5773`，MASE `2.3726`。
+- TimeRAG-LSTM（512 候选）：SMAPE `8.5530`，MASE `2.4054`。
+
+RAG 的 SMAPE 仅改善 `0.0243`，但 MASE 变差 `0.0328`，属于混合结果，尚不能
+宣称检索整体优于 plain LSTM。正式结论必须来自全量 Weekly 的匹配实验。
+
+### Gated future prior 优化
+
+逐序列分析显示，history-channel RAG 在 359 条序列中的 186 条上更好，中位误差也
+略好，但少数大幅退化序列使整体 MASE 变差。DTW 距离和 exact recall 对相对收益的
+解释力较弱，主要瓶颈是旧模型只看到相似历史，不知道这些历史随后发生了什么。
+
+新路径实现了：
+
+1. `train_tail` 训练期验证：每条 official train 的最后 `H` 点作为验证目标，前 `L`
+   点作为验证输入，official test 不参与参数选择。
+2. outcome bank：只保存训练窗口的 future，并使用对应 candidate input 的统计量标准化。
+3. 完整 episode 规则：同序列候选必须满足
+   `candidate_cutoff + H <= query_cutoff - L`。
+4. future prior：对 top-k candidate future 使用稳定的
+   `softmax(-distance / temperature)` 加权，结果与邻居排列无关。
+5. gated residual：query-only LSTM 生成 base forecast，再用可学习凸 gate 与 future
+   prior 融合。旧 `rag_lstm` 保留为 history-channel 消融。
+6. 缓存 schema 升为 v3，并将 candidate horizon 纳入指纹。
+
+10k、10 epoch 的训练尾部验证结果：
+
+```text
+Model                         SMAPE    MASE      Selection score
+Plain LSTM                    9.0424   2.5607    0.9335
+History-channel RAG           9.2236   2.5880    0.9481
+Gated future, temperature .25 8.8750   2.5600    0.9243
+Gated future, temperature .50 8.9259   2.5587    0.9268
+Gated future, temperature 1.0 8.9384   2.5645    0.9285
+```
+
+选择分数预先固定为
+`0.5 * (SMAPE / persistence_SMAPE + MASE / persistence_MASE)`，越低越好，因此
+选择 temperature `0.25`。对应的 10k official-test 结果为：
+
+- matched plain LSTM：SMAPE `8.5773`，MASE `2.3726`。
+- gated-future RAG：SMAPE `8.4361`，MASE `2.3809`，learned gate `0.1327`。
+
+新模型的 SMAPE 数值改善 `0.1412`（相对下降 `1.646%`），并将旧 RAG 的 MASE
+退化从 `+0.0328` 缩小到 `+0.0083`。逐序列 bootstrap 的 SMAPE 差值 95% 区间为
+`[-0.2843, 0.0130]`，因此不能声称统计显著；整体仍是混合结果，也不能宣称两项指标
+都优于 plain LSTM。温度选择没有直接使用 official-test target，但更早的架构诊断曾查看
+official-test 结果，所以该测试结果不应描述为完全未查看的最终盲测。当前完整回归为 45 个测试通过。

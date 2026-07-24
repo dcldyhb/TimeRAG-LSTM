@@ -6,6 +6,6 @@ results/
 .vscode/
 checkpoints/
 runs/
-tests/
 logs/
 runs_fixed_cpu/
+cache/

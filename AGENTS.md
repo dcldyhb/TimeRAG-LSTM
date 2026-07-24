@@ -1,528 +1,188 @@
-# TimeRAG + LSTM Experiment Agent Guide
-
-## Project Goal
-
-Build a lightweight reproduction of the TimeRAG idea without using an LLM.
-
-The core experiment is:
-
-- Baseline: LSTM time-series forecasting.
-- Proposed: TimeRAG-LSTM, using a time-series knowledge base plus DTW top-k retrieval as extra input to LSTM.
-- Main question: Does retrieval-enhanced forecasting outperform plain LSTM?
-
-The first target is not to reproduce the full TimeRAG paper table. The first target is to complete a reliable closed-loop experiment on M4 Weekly.
-
-## Available Devices
-
-### 1. Windows 11 Laptop
-
-Hardware:
-
-- CPU: i9-12900H
-- GPU: RTX 3060 Laptop
-- RAM: 16 GB
-- Disk free: about 215 GB
-- Has WSL Ubuntu 22.04
-
-Role:
-
-- Main code development.
-- Small-sample debugging.
-- Optional small GPU tests with RTX 3060.
-- Code packaging and synchronization to server.
-
-Use WSL Ubuntu 22.04 as the main development environment. Prefer storing the project under the WSL Linux filesystem, for example:
-
-```bash
-~/code/TimeRAG-LSTM
-```
-
-Avoid placing the active training project under `/mnt/c/...` because file I/O can be slower.
-
-### 2. MacBook Air
-
-Hardware:
-
-- Apple M4
-- RAM: 16 GB
-- Disk free: about 74 GB
-
-Role:
-
-- Reading papers.
-- Writing reports.
-- Reviewing plots and result tables.
-- Backup lightweight development.
-
-Do not use it as the main CUDA training device.
-
-### 3. Lab Server via Sunlogin Remote Desktop
-
-Hardware shown by `nvidia-smi`:
-
-- 4 x NVIDIA GeForce RTX 4090
-- 24 GB VRAM per GPU
-- CUDA 12.7 shown by driver
-
-Role:
-
-- Main formal experiment machine.
-- Run full Weekly experiments.
-- Run Daily and Monthly extensions.
-- Cache DTW retrieval results.
-
-Use only one free RTX 4090 at first. GPU 1 or GPU 2 is preferred if idle.
-
-## Device Workflow
-
-Recommended workflow:
-
-```text
-WSL Ubuntu 22.04 on Windows
--> local small-sample debugging
--> upload/sync to lab server
--> run formal experiments on one RTX 4090
--> pull results back to local machine
--> analyze and write report
-```
-
-The server should be treated as a compute machine, not the main code editing machine.
-
-## Project Directory
-
-Recommended structure:
-
-```text
-TimeRAG-LSTM/
-├── data/
-│   └── m4/
-├── src/
-│   ├── data.py
-│   ├── metrics.py
-│   ├── models.py
-│   ├── retrieval.py
-│   └── utils.py
-├── scripts/
-├── configs/
-├── checkpoints/
-├── results/
-├── logs/
-├── train.py
-├── requirements.txt
-└── README.md
-```
-
-Large data, checkpoints, logs, and cached retrieval files should not be mixed with source code.
-
-## Experiment Stages
-
-### Stage 0: Preparation
-
-Device:
-
-- Windows WSL
-- Lab server via Sunlogin
-
-Tasks:
-
-- Confirm M4 dataset source.
-- Confirm server usage rules.
-- Check whether the lab server is idle before running.
-- Confirm Python, conda, CUDA, and PyTorch availability.
-- Create project structure.
-
-Server checks:
-
-```bash
-nvidia-smi
-```
-
-On Linux server, also check:
-
-```bash
-who
-w
-```
-
-Do not kill other users' processes.
-
-### Stage 1: Local Development
-
-Device:
-
-- Windows WSL Ubuntu 22.04
-
-Tasks:
-
-- Implement M4 data loading.
-- Implement sliding-window sample construction.
-- Implement LSTM baseline.
-- Implement SMAPE and MASE metrics.
-- Implement `train.py` with command-line arguments.
-
-Minimum local debug:
-
-- Use M4 Weekly or fake toy data.
-- Use about 100 samples.
-- Train for 1-2 epochs.
-- Confirm loss decreases.
-- Confirm metrics and result files are saved.
-
-### Stage 2: Retrieval and RAG-LSTM Debug
-
-Device:
-
-- Windows WSL
-- Optional RTX 3060 Laptop GPU
-
-Tasks:
-
-- Implement time-series knowledge base construction.
-- Implement DTW top-k retrieval.
-- Save retrieval cache, for example `retrieved_indices.npy`.
-- Implement RAG-LSTM.
-
-Recommended first design:
-
-- Query length: `L`
-- Retrieved sequence count: `top_k = 5`
-- Input tensor after retrieval: `[query, retrieved_1, ..., retrieved_5]`
-- Treat them as channels: shape `batch_size x L x 6`
-- Feed into LSTM and predict future `H` steps.
-
-The goal is correctness, not high accuracy yet.
-
-### Stage 3: Upload to Lab Server
-
-Device:
-
-- Windows WSL -> lab server
-
-Preferred sync method if SSH is available:
-
-```bash
-rsync -av ~/TimeRAG-LSTM/ USER@SERVER:/home/USER/TimeRAG-LSTM/
-```
-
-If SSH is not convenient, package the project:
-
-```bash
-tar -czf TimeRAG-LSTM.tar.gz TimeRAG-LSTM
-```
-
-Then transfer it via Sunlogin remote desktop.
-
-On the server:
-
-- Create or activate conda environment.
-- Install dependencies.
-- Place M4 data under a fixed path.
-- Run a small debug job first.
-
-### Stage 4: First Formal Experiment on M4 Weekly
-
-Device:
-
-- Lab server, one RTX 4090
-
-Frequency:
-
-- M4 Weekly
-
-Settings:
-
-- Input length: 26
-- Prediction length: 13
-- Retrieval top-k: 5
-
-Run order:
-
-1. Train and evaluate LSTM baseline.
-2. Build Weekly knowledge base.
-3. Compute and cache DTW top-5 retrieval results.
-4. Train and evaluate RAG-LSTM.
-5. Save metrics, logs, prediction plots, and retrieval example plots.
-
-Required outputs:
-
-```text
-results/
-├── weekly_lstm_metrics.json
-├── weekly_rag_lstm_metrics.json
-├── weekly_comparison.csv
-├── weekly_prediction_plot.png
-└── weekly_retrieval_example.png
-```
-
-This stage is the minimum complete reproduction.
-
-### Stage 5: Extension Experiments
-
-Device:
-
-- Lab server, one RTX 4090
-
-Recommended order:
-
-```text
-Weekly -> Daily -> Monthly
-```
-
-Only expand after Weekly is stable.
-
-For each frequency:
-
-- Run LSTM baseline.
-- Build or load knowledge base.
-- Cache DTW retrieval.
-- Run RAG-LSTM.
-- Save metrics and plots.
-
-Do not start with all six M4 frequencies.
-
-### Stage 6: Result Analysis and Report
-
-Device:
-
-- Windows WSL
-- Windows desktop
-- MacBook Air
-
-Tasks:
-
-- Pull `results/` and `logs/` back from the server.
-- Create comparison tables.
-- Inspect prediction curves.
-- Inspect retrieval examples.
-- Write a short experiment report.
-
-The report should clearly state:
-
-- This is a lightweight reproduction of the TimeRAG idea.
-- It uses LSTM instead of an LLM.
-- The reproduced part is time-series knowledge base plus DTW retrieval augmentation.
-- The main comparison is LSTM vs TimeRAG-LSTM.
-
-## Minimum Success Criteria
-
-Minimum:
-
-- M4 Weekly is completed.
-- LSTM and RAG-LSTM are both trained and evaluated.
-- SMAPE and MASE are reported.
-- At least one prediction plot is produced.
-- At least one retrieval example plot is produced.
-
-Solid:
-
-- Weekly, Daily, and Monthly are completed.
-- Average results show whether retrieval helps.
-
-Full extension:
-
-- All six M4 frequencies are completed.
-
-## Metrics
-
-Required:
-
-- SMAPE
-- MASE
-
-Optional:
-
-- MAE
-- MSE
-
-When reporting results, keep the table simple:
-
-```text
-Dataset | Model | SMAPE | MASE
-M4-Weekly | LSTM | ...
-M4-Weekly | TimeRAG-LSTM | ...
-```
-
-## Server Usage Rules
-
-Before running experiments:
-
-- Ask or confirm whether the server is free.
-- Use `nvidia-smi` to check GPU usage.
-- Do not use a GPU that is already heavily occupied.
-- Do not kill processes that are not yours.
-- Do not reboot, shut down, log out, or sleep the server.
-- Use logs for long-running experiments.
-
-If using Windows PowerShell on the server:
-
-```powershell
-$env:CUDA_VISIBLE_DEVICES="1"
-python train.py --freq Weekly --model rag_lstm --top_k 5
-```
-
-If using Linux shell:
-
-```bash
-CUDA_VISIBLE_DEVICES=1 python train.py --freq Weekly --model rag_lstm --top_k 5
-```
-
-Prefer saving logs:
-
-```bash
-python train.py --freq Weekly --model rag_lstm --top_k 5 > logs/weekly_rag.log 2>&1
-```
-
-## Implementation Notes
-
-- Build a retrieval cache before training RAG-LSTM to avoid recomputing DTW every epoch.
-- Start with simple channel fusion for RAG-LSTM.
-- Normalize time series before DTW retrieval.
-- Ensure the knowledge base is built only from training data.
-- Avoid test leakage.
-- Fix random seeds for reproducibility.
-- Save configuration with every run.
-
-## Current Priority
-
-The next concrete goal is:
-
-```text
-Implement the Stage 2 training-only knowledge base and DTW top-k retrieval cache.
-```
-
-After that:
-
-```text
-Implement retrieval correctness and no-leakage tests, then use the verified cache to implement and debug RAG-LSTM.
-```
-## Mandatory Progress Review and Synchronization
-
-The agent must treat the progress section in this file as persistent project memory and follow this protocol on **every user turn**.
-
-### Before Answering or Acting
-
-1. Read `AGENTS.md`, especially `## Project Progress (Agent-maintained)` and `## Current Priority`.
-2. Review relevant repository evidence (changed files, tests, results, logs, or user-provided updates) when needed to verify the actual state.
-3. Use the recorded progress to decide the next action. Do not claim that a task is complete without evidence.
-4. If the progress record conflicts with repository evidence or the user's latest message, correct the record before proceeding.
-
-### Before Sending the Final Answer
-
-After completing the user's request, but **before sending the final response**:
-
-1. Reassess the project's progress from the work completed in the current turn and any new evidence.
-2. Update `## Project Progress (Agent-maintained)` in `AGENTS.md`:
-   - update `Last reviewed` on every turn;
-   - update the current stage and status;
-   - move verified items among `Completed`, `In progress`, `Blocked`, and `Next actions`;
-   - record important decisions, generated artifacts, test outcomes, and blockers;
-   - keep `## Current Priority` consistent with the first unfinished next action.
-3. If no project progress changed, still update `Last reviewed` and state that the progress was reviewed with no status change in `Latest update`.
-4. Keep entries concise, factual, and based on evidence. Never invent test results or completion states.
-5. In the final response, briefly mention that the progress record was synchronized and summarize any status change.
-
-### Progress Status Definitions
-
-- `Not started`: no implementation evidence exists.
-- `In progress`: implementation has begun but required verification or outputs are incomplete.
-- `Blocked`: progress cannot continue without user input, missing data/access, or an external dependency.
-- `Completed`: implementation and the relevant verification have both succeeded.
-
-## Project Progress (Agent-maintained)
-
-- **Last reviewed:** 2026-07-20
-- **Current stage:** Stage 2 - Retrieval and RAG-LSTM Debug
-- **Overall status:** In progress
-- **Latest update:** Progress reviewed again on 2026-07-20 with no status change. Rechecked the plain-LSTM state flow: `nn.LSTM` maintains hidden and cell states internally across each 26-step window, `forward()` uses the final sequence output for the 13-step forecast, and no recurrent state is carried across windows or batches; DTW retrieval remains the first unfinished action.
-
-### Completed
-
-- [x] Created the initial project directory structure.
-- [x] Added initial SMAPE/MASE metric implementation in `src/metric.py` with `tests/test_metric.py` present.
-- [x] Added M4 data-loading/sliding-window work in `src/data.py` with `tests/test_data.py` present.
-- [x] Documented metric concepts and data-loading progress in `steps.md`.
-- [x] Verified all 8 existing data and metric unit tests pass with `python3 -m unittest discover -s tests -v` on 2026-07-17.
-- [x] Committed all 16 local M4 dataset files under `data/` using Git LFS and pushed them to GitHub.
-- [x] Confirmed the M4 Weekly train/evaluation boundary on real data: training windows use only `train`, while evaluation uses the `train` tail as input and official `test` values as targets.
-- [x] Configured and syntax-verified the Apple Silicon macOS PyTorch requirement in `requirements.txt`.
-- [x] Installed PyTorch 2.7.1 in the project Conda environment and verified all 16 unit tests pass without skips, including the end-to-end training pipeline test.
-- [x] Verified a plain LSTM forward pass produces `(8, 13)` output on the selected fallback CPU device.
-- [x] Implemented the baseline training/evaluation CLI in `train.py` with reproducible sampling, input-only standardization, batched training/inference, SMAPE/MASE evaluation, and persisted configuration/results.
-- [x] Ran `python train.py --freq Weekly --max-samples 100 --epochs 2` on CPU: loss decreased from `6.682118` to `6.647610`, prediction shape was `(359, 13)`, SMAPE was `12.1946`, and MASE was `4.9444`.
-- [x] Verified `results/weekly_lstm_metrics.json`, `results/weekly_lstm_predictions.npz`, and `checkpoints/weekly_lstm.pt` were created and readable.
-- [x] Confirmed in the user's interactive Conda terminal that `torch.backends.mps.is_built()` and `is_available()` are both `True`, and `src.config.DEVICE` is `mps`.
-- [x] Added `tensorboard` and `matplotlib` to `requirements.txt`, installed TensorBoard 2.21.0 and Matplotlib 3.11.1, and verified `pip check` reports no broken requirements.
-- [x] Added timestamped TensorBoard logging for training loss, SMAPE, MASE, configuration text, and three prediction figures, while preserving JSON/NPZ/checkpoint outputs.
-- [x] Added standalone `weekly_prediction_plot.png` generation and visually verified the real-data smoke plot is nonblank, correctly labeled, and correctly separates history from the forecast horizon.
-- [x] Extended the end-to-end training test to validate TensorBoard scalar/image tags and the PNG artifact; all 16 tests pass.
-- [x] Verified the user's interactive MPS visualization smoke run created metrics, predictions, a checkpoint, a standalone PNG, and readable TensorBoard events under the requested project directories.
-- [x] Reviewed the 10k-sample MPS run: SMAPE improved to 11.5248 and MASE to 3.9326 but remained worse than persistence (9.1613/2.7773); isolated one W10 training window as 99.9439% of total normalized-target MSE.
-- [x] Added an input-derived relative scale floor to `standardize_by_input`, preserving the input-only/no-target-statistics contract, plus a W10-like regression test.
-- [x] Replaced MSE training with configurable Smooth L1 loss and added persistence metrics/predictions to JSON, NPZ, plots, and TensorBoard.
-- [x] Verified all 17 tests pass after stabilization.
-- [x] Ran the fixed 10k-sample, 10-epoch CPU baseline: loss `1.0213 -> 0.9021`, SMAPE `8.5773`, MASE `2.3726`, beating persistence overall and on 227/359 series.
-- [x] Completed and verified the full 353,270-window, 20-epoch Weekly MPS baseline: loss `0.895653 -> 0.720595`, SMAPE `8.5460`, MASE `2.3428`, beating persistence overall and on 220/359 series by SMAPE.
-
-### In Progress
-
-- None recorded.
-
-### Blocked
-
-- None recorded.
-
-### Next Actions
-
-1. Implement the Stage 2 knowledge-base and DTW top-k retrieval cache in `src/retrieval.py` using training data only.
-2. Add retrieval correctness and no-leakage tests on toy data.
-3. Use the verified cache to implement and locally debug TimeRAG-LSTM.
-
-### Verified Artifacts
-
-- `src/data.py` (input-only relative scale floor verified on W10-like data)
-- `src/metric.py`
-- `src/config.py` (unit tests pass; interactive-terminal MPS selection verified)
-- `src/models.py` (unit tests and CPU forward pass verified)
-- `train.py` (Smooth L1, persistence comparison, TensorBoard, and fixed 10k run verified)
-- `tests/test_data.py`
-- `tests/test_metric.py`
-- `tests/test_config.py`
-- `tests/test_models.py`
-- `tests/test_train.py` (TensorBoard scalar/image and PNG assertions pass)
-- `requirements.txt`
-- `README.md`
-- `steps.md`
-- `data/` (16 files tracked with Git LFS)
-- `.gitattributes`
-- `results/weekly_lstm_metrics.json` (100-sample, 2-epoch CPU debug run)
-- `results/weekly_lstm_predictions.npz` (verified `(359, 13)` predictions)
-- `checkpoints/weekly_lstm.pt` (verified readable checkpoint)
-- `results/weekly_mps_smoke/weekly_lstm_metrics.json` (MPS smoke result; correctness-only)
-- `results/weekly_mps_smoke/weekly_lstm_predictions.npz`
-- `results/weekly_mps_smoke/weekly_prediction_plot.png`
-- `checkpoints/weekly_mps_smoke/weekly_lstm.pt`
-- `runs/weekly_lstm_20260719-233949-824490/` (verified TensorBoard events)
-- `results/weekly_local_10k/weekly_lstm_metrics.json` (outlier-dominated MPS run; diagnostic evidence)
-- `results/weekly_local_10k/weekly_lstm_predictions.npz`
-- `results/weekly_local_10k/weekly_prediction_plot.png`
-- `checkpoints/weekly_local_10k/weekly_lstm.pt`
-- `runs/weekly_lstm_20260719-234555-948031/` (verified 10-epoch TensorBoard events)
-- `results/weekly_local_10k_fixed_cpu/weekly_lstm_metrics.json` (stabilized 10k baseline)
-- `results/weekly_local_10k_fixed_cpu/weekly_lstm_predictions.npz`
-- `results/weekly_local_10k_fixed_cpu/weekly_prediction_plot.png`
-- `checkpoints/weekly_local_10k_fixed_cpu/weekly_lstm.pt`
-- `runs_fixed_cpu/weekly_lstm_20260719-235850-519922/` (verified stabilized TensorBoard events)
-- `results/weekly_full_lstm/weekly_lstm_metrics.json` (verified full Weekly MPS metrics)
-- `results/weekly_full_lstm/weekly_lstm_predictions.npz` (verified IDs, targets, LSTM, and persistence arrays with shape `(359, 13)`)
-- `results/weekly_full_lstm/weekly_prediction_plot.png` (visually verified W1 forecast plot)
-- `checkpoints/weekly_full_lstm/weekly_lstm.pt`
-- `logs/weekly_full_lstm.log` (complete 20-epoch log)
-- `runs/weekly_full_lstm/weekly_lstm_20260720-000723-020716/` (verified full loss curve, metrics, and W1-W3 image tags)
-
-### Progress Update Rules
-
-- Preserve this section as the single source of truth for project status.
-- Prefer updating existing bullets over appending duplicate history.
-- Add paths to important new artifacts under `Verified Artifacts` only after confirming they exist.
-- Mark tests or experiments complete only when their command and outcome have been observed.
-- Keep detailed historical notes in `steps.md` or result/log files; keep this section focused on current state.
+# TimeRAG-LSTM Agent Guide
+
+`AGENTS.md` owns only the compact, durable project handoff and agent policy.
+It is not a turn log, monitor, tutorial, experiment history, or artifact index.
+
+## Fast Path
+
+For each repository task:
+
+1. Read `Current Handoff`, `Experiment Contracts`, and `Write Gate`.
+2. Inspect only task-relevant source, tests, results, or logs.
+3. Run `git status --short` before editing; preserve unrelated user work.
+4. Resolve ambiguity in scope, environment, or acceptance criteria before
+   non-trivial action.
+5. Never claim completion without admissible evidence.
+
+After compaction or context loss, reread this file and the active action's
+evidence before modifying, running, or reporting. Briefly state the recovered
+goal, open actions, and risks. If the handoff conflicts with the checkout or the
+latest user message, stop and report it. Correct it only in a change task or
+explicit progress-sync task, never silently during read-only work.
+
+## Current Handoff
+
+- **Last material handoff update:** 2026-07-24 21:49 CST
+- **Stage:** Stage 4 - Full M4 Weekly experiment
+- **Status:** In progress; full strict-episode cache verified, gated run next
+- **Formal workspace:** AutoDL `/root/autodl-tmp/TimeRAG-LSTM`
+  (user-provided remote state)
+- **Last run evidence:** User-provided AutoDL output verified the full cache at
+  `cache/weekly_full_gated_t025/weekly_dtw_top5_b644bb412e5f.npz`: readable
+  `(353270, 5)` training and `(359, 5)` evaluation indices/distances, all
+  distances finite, formal configuration matched, and a repeat cache-only run
+  loaded it and exited `0`. Build time was `10333.17s`; SHA-256 is
+  `eb34659ebe01ec77827478f9448c9f558ea41495653dcf1fac6eaca9b1c04347`.
+- **Recovery risk:** The verified cache is currently evidenced only in the
+  AutoDL data-disk workspace. Run the formal training under `screen`, require
+  this exact cache to load, and preserve its completion log and outputs.
+- **Blockers:** None
+
+### Ordered Actions
+
+1. **Active:** Run and verify the matched full gated-future Weekly experiment
+   at temperature `0.25`, loading the verified `b644bb412e5f` cache. Require
+   terminal success, exact formal configuration, metrics, predictions,
+   checkpoint, completion log, and readable forecast/retrieval plots.
+2. Compare it with the verified full plain-LSTM baseline and inspect the
+   per-series error tail.
+3. If harmful MASE outliers persist, develop any adaptive gate on `train_tail`,
+   never official-test targets.
+
+### Verified Milestones
+
+- Weekly data, metrics, plain/history/gated models, retrieval/cache paths, CLI,
+  and required outputs are implemented.
+- The current suite has 45 tests; recorded local/WSL checks and user-provided
+  AutoDL output show passing runs.
+- Full plain baseline, 353,270 windows and 20 epochs: SMAPE `8.5460`, MASE
+  `2.3428`.
+- Train-tail selection chose temperature `0.25`.
+- Matched 10k official result is mixed: gated `8.4361/2.3809` versus plain
+  `8.5773/2.3726` SMAPE/MASE.
+- WSL CUDA was directly verified; user-provided AutoDL output shows RTX 4090
+  dependency, CUDA, test, and 100-window gated smoke checks passed.
+- The clean server package was directly verified; user output shows the AutoDL
+  tree moved to the faster data disk.
+- The full 353,270-window v3 strict-episode gated cache was built and verified
+  on AutoDL; its arrays are readable and finite, formal config matches, and a
+  repeat cache-only run loaded it and exited `0`.
+
+Canonical evidence:
+
+- `results/weekly_full_lstm/weekly_lstm_metrics.json`
+- `results/weekly_gated_validation_comparison.csv`
+- `results/weekly_gated_rag_10k_t025/weekly_gated_rag_lstm_metrics.json`
+- `results/weekly_gated_10k_comparison.csv`
+- AutoDL `cache/weekly_full_gated_t025/weekly_dtw_top5_b644bb412e5f.npz`
+- AutoDL `results/weekly_full_gated_t025/weekly_gated_rag_lstm_cache.json`
+
+## Experiment Contracts
+
+- Goal: compare plain LSTM with retrieval-enhanced LSTM in a lightweight
+  no-LLM TimeRAG reproduction. Finish Weekly before Daily or Monthly.
+- Matched full settings: all 353,270 windows (`max_samples` omitted),
+  `official_test`, input `26`, horizon `13`, epochs `20`, batch `32`,
+  hidden `64`, one layer, dropout `0`, learning rate `0.001`, scale floor
+  `0.001`, Smooth L1 beta `1.0`, seed `42`.
+- Gated-only settings: `top_k=5`, Euclidean pool `512`, query batch `64`,
+  one retrieval worker, temperature `0.25`, initial gate `0.1`. Compare
+  against the verified MPS baseline; same-device rerun is optional robustness.
+- Training windows, knowledge base, and outcome bank use official-train only.
+  Each sample's normalization statistics come only from its input window.
+- Select models and hyperparameters on official-train `train_tail`.
+  Official-test targets are final evaluation data, never tuning data.
+- For same-series gated candidates, enforce
+  `candidate_cutoff + horizon <= query_cutoff - input_length`.
+- Gated caches are v3, horizon-aware, content-fingerprinted, structurally
+  validated, and atomically written. Never reuse v2 input-only causal caches.
+- Exact DTW is a small oracle; scalable retrieval is cKDTree Euclidean
+  prefiltering followed by exact DTW reranking.
+- Formal outputs: effective config, SMAPE/MASE, predictions, checkpoint, log,
+  prediction plot, and retrieval plot.
+- Report mixed/negative results honestly. Stage 4 ends only after the full
+  cache, gated run, required artifacts, and matched comparison are verified.
+
+## Server Safety
+
+- Use local macOS/WSL for development and smoke tests; use current AutoDL for
+  the formal run.
+- On a shared server, inspect `nvidia-smi`, `who`, and `w`; use one idle
+  GPU. Never kill others' processes or reboot/shut down/log out/sleep the host.
+- Log long runs and preserve effective configuration. Old terminal output is
+  historical evidence, not current remote state.
+- Match commands to Linux shell, PowerShell, or CMD. Verify README examples
+  match the live platform and model.
+
+## Evidence Routing
+
+| Information | Owner |
+|---|---|
+| Current objective, state, blocker, next action | `AGENTS.md` |
+| Setup and reusable verified commands | `README.md` |
+| Design history, diagnoses, superseded metrics | `steps.md` |
+| Behavior contracts | relevant `src/` and `tests/` |
+| Effective config and metrics | exact `results/` JSON/CSV |
+| Runtime output and telemetry | `logs/` or TensorBoard |
+| Predictions, caches, checkpoints, plots | their output directories |
+
+Read only the owner(s) needed for the task. Result verification requires the
+exact config, completion log, parsed metrics, and readable required artifacts.
+
+## Write Gate
+
+Edit this file only when all are true:
+
+1. The task authorizes repository changes.
+2. New direct or user-provided evidence exists.
+3. It causes a durable semantic state change.
+4. `AGENTS.md` owns that information.
+
+Qualifying changes are limited to:
+
+- active objective, stage, status, blocker, or ordered actions;
+- acceptance criteria or formal experiment outcome;
+- current-objective readiness changing among unknown/not ready/ready;
+- an actual project-level experiment, causality, validation, or leakage
+  contract change;
+- a canonical artifact needed for the active/next action;
+- a contradicted `Current Handoff` field that affects those actions.
+
+Do not write for:
+
+- explanations, walkthroughs, reviews, plans, or command help;
+- timestamp-only reviews, unchanged status, or running-job heartbeats;
+- PID, utilization, memory, percentage, ETA, or other volatile telemetry;
+- expected commands/artifacts, speculation, or unverified claims;
+- repeated tests when code/config/data/cache state is unchanged;
+- every smoke artifact, checkpoint, raw metric table, or agent narration.
+
+A long job warrants an update only on a durable transition such as
+`not started -> running` or `running -> verified complete/failed`. Process
+disappearance alone is not terminal evidence.
+
+### Evidence Standard
+
+- **Direct:** current command, file, parsed artifact, or test inspection.
+- **User-provided:** only facts explicitly shown in supplied output; label them.
+- **Unverified:** inferred, expected, stale, or unsupported; never use for
+  `Completed` or `Verified`.
+
+Verification must postdate relevant changes and identify the checkout/content
+state plus effective config and data/cache fingerprint when applicable.
+`Completed` requires implementation and verification; experiments also require
+terminal success, parsed metrics, and readable required artifacts. `Blocked`
+requires a safe failed attempt or confirmed missing permission, input,
+dependency, or necessary user decision; never manufacture a risky failure.
+
+### Update Rules
+
+1. If the semantic diff is empty, do not edit.
+2. Replace state in place; never append a turn log.
+3. When action 1 completes, atomically archive its milestone, promote action 2
+   with exit criteria, and sync stage, status, blockers, and evidence.
+4. Change `Last material handoff update` only with a semantic update.
+5. Keep one active action, at most three actions, eight milestones, current
+   blockers, and six canonical evidence anchors.
+6. On overflow, remove superseded entries, then those unrelated to active/next
+   actions; preserve useful history in `steps.md`.

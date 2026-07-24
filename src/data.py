@@ -44,6 +44,14 @@ class WindowedSamples:
         return len(self.inputs)
 
 
+@dataclass(frozen=True)
+class TemporalValidationSplit:
+    """Training-only fit series and one held-out validation sample per series."""
+
+    fit_series: tuple[np.ndarray, ...]
+    validation_samples: WindowedSamples
+
+
 # 规范化频率名称
 def _normalise_frequency(frequency: str) -> str:
     value = frequency.strip().capitalize() # 去除字符串两侧空格，首字母大写
@@ -228,6 +236,67 @@ def build_evaluation_windows(data: M4FrequencyData, input_length: int) -> Window
     series_indices = np.arange(len(data.ids), dtype=np.int32)
     cutoffs = np.asarray([len(values) for values in data.train], dtype=np.int32)
     return WindowedSamples(inputs, targets, series_indices, cutoffs)
+
+
+def build_temporal_validation_split(
+    train_series: Sequence[np.ndarray],
+    input_length: int,
+    horizon: int,
+) -> TemporalValidationSplit:
+    """Hold out each official-train tail without consulting official test data.
+
+    For a train series of length ``T``, the validation target is
+    ``[T - horizon:T]``, its input is the immediately preceding
+    ``input_length`` values, and the fit series is truncated to
+    ``[0:T - horizon]``.
+    """
+    if input_length <= 0 or horizon <= 0:
+        raise ValueError("input_length and horizon must be positive")
+    if len(train_series) == 0:
+        raise ValueError("train_series must contain at least one series")
+
+    required_length = input_length + horizon
+    values_by_series: list[np.ndarray] = []
+    too_short: list[int] = []
+    for series_index, values in enumerate(train_series):
+        array = np.asarray(values, dtype=np.float32)
+        if array.ndim != 1:
+            raise ValueError(
+                f"train_series[{series_index}] must be one-dimensional, "
+                f"got shape {array.shape}"
+            )
+        if len(array) < required_length:
+            too_short.append(series_index)
+        values_by_series.append(array)
+
+    if too_short:
+        raise ValueError(
+            f"{len(too_short)} training series are shorter than "
+            f"input_length + horizon={required_length}; "
+            f"indices: {too_short[:5]}"
+        )
+
+    series_count = len(values_by_series)
+    inputs = np.empty((series_count, input_length), dtype=np.float32)
+    targets = np.empty((series_count, horizon), dtype=np.float32)
+    cutoffs = np.empty(series_count, dtype=np.int32)
+    fit_series: list[np.ndarray] = []
+
+    for series_index, values in enumerate(values_by_series):
+        target_start = len(values) - horizon
+        input_start = target_start - input_length
+        fit_series.append(values[:target_start].copy())
+        inputs[series_index] = values[input_start:target_start]
+        targets[series_index] = values[target_start:]
+        cutoffs[series_index] = target_start
+
+    validation_samples = WindowedSamples(
+        inputs=inputs,
+        targets=targets,
+        series_indices=np.arange(series_count, dtype=np.int32),
+        cutoffs=cutoffs,
+    )
+    return TemporalValidationSplit(tuple(fit_series), validation_samples)
 
 
 def standardize_by_input(
