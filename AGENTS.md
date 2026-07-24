@@ -22,32 +22,32 @@ explicit progress-sync task, never silently during read-only work.
 
 ## Current Handoff
 
-- **Last material handoff update:** 2026-07-24 22:07 CST
+- **Last material handoff update:** 2026-07-24 22:59 CST
 - **Stage:** Stage 4 - Full M4 Weekly experiment
-- **Status:** In progress; full gated-future Weekly run active on AutoDL
+- **Status:** Completed; the verified full gated-future result is worse than
+  the full plain-LSTM baseline on both primary metrics
 - **Formal workspace:** AutoDL `/root/autodl-tmp/TimeRAG-LSTM`
   (user-provided remote state)
-- **Last run evidence:** At 2026-07-24 22:07 CST, user-provided AutoDL output
-  showed the matched 353,270-window, 20-epoch gated-future run active in a
-  detached `screen`. It loaded the verified `b644bb412e5f` cache and reported
-  `evaluation=official_test` and `device=cuda`; the displayed command matches
-  the formal configuration.
-- **Recovery risk:** Running status is not completion evidence. Require
-  `logs/weekly_full_gated_t025_train.exit` with exit code `0`, a complete log,
-  parsed metrics/configuration, and readable required artifacts before marking
-  the experiment complete or comparing results.
+- **Last run evidence:** The user-provided AutoDL analysis archive was
+  independently parsed on 2026-07-24. The matched 353,270-window, 20-epoch
+  gated-future CUDA run loaded cache `b644bb412e5f`, exited `0` after `1356s`,
+  and scored SMAPE/MASE `8.8535/2.4228` with learned gate `0.674363`.
+  JSON, NPZ, checkpoint, TensorBoard events, and both PNGs are readable and
+  mutually consistent.
+- **Recovery risk:** The formal gated result used CUDA while the verified plain
+  baseline used MPS. Their configuration, IDs, targets, and persistence output
+  match, but a same-device rerun remains optional robustness evidence. Do not
+  tune a new gate on the official-test error tail.
 - **Blockers:** None
 
 ### Ordered Actions
 
-1. **Active:** Monitor and verify the matched full gated-future Weekly
-   experiment at temperature `0.25`. Require terminal success, exact formal
-   configuration, metrics, predictions, checkpoint, completion log, and
-   readable forecast/retrieval plots.
-2. Compare it with the verified full plain-LSTM baseline and inspect the
-   per-series error tail.
-3. If harmful MASE outliers persist, develop any adaptive gate on `train_tail`,
-   never official-test targets.
+1. **Active:** Decide whether to report the verified negative Weekly result as
+   the experiment conclusion or authorize a sample-adaptive gate follow-up.
+2. If authorized, develop and select the adaptive gate only on `train_tail`,
+   then freeze it before one official-test evaluation.
+3. Optionally rerun plain and gated on the same CUDA device for robustness;
+   expand to Daily or Monthly only after the Weekly research decision.
 
 ### Verified Milestones
 
@@ -58,24 +58,31 @@ explicit progress-sync task, never silently during read-only work.
 - Full plain baseline, 353,270 windows and 20 epochs: SMAPE `8.5460`, MASE
   `2.3428`.
 - Train-tail selection chose temperature `0.25`.
-- Matched 10k official result is mixed: gated `8.4361/2.3809` versus plain
-  `8.5773/2.3726` SMAPE/MASE.
-- WSL CUDA was directly verified; user-provided AutoDL output shows RTX 4090
-  dependency, CUDA, test, and 100-window gated smoke checks passed.
-- The clean server package was directly verified; user output shows the AutoDL
-  tree moved to the faster data disk.
 - The full 353,270-window v3 strict-episode gated cache was built and verified
   on AutoDL; its arrays are readable and finite, formal config matches, and a
   repeat cache-only run loaded it and exited `0`.
+- The full gated run is verified at SMAPE/MASE `8.8535/2.4228`; persistence is
+  `9.1613/2.7773`, retrieval prior is `9.3441/2.7277`, and loss decreased
+  `0.757354 -> 0.651752` across all 20 epochs.
+- Against plain, gated regresses by `+0.3075` SMAPE and `+0.0800` MASE; it wins
+  only `169/359` series by SMAPE and `171/359` by MASE, with positive median
+  deltas. Paired-series bootstrap 95% intervals include zero.
+- Gated-minus-plain and retrieval-prior-minus-plain per-series MASE deltas have
+  correlation `0.9439`, so harmful retrieved futures are the main follow-up
+  signal; official-test targets cannot be used to design the fix.
+- Checkpoint tensors are finite, TensorBoard contains 20 loss points plus all
+  declared metrics/images/configuration, and both standalone plots passed
+  decode and visual checks.
 
 Canonical evidence:
 
 - `results/weekly_full_lstm/weekly_lstm_metrics.json`
-- `results/weekly_gated_validation_comparison.csv`
-- `results/weekly_gated_rag_10k_t025/weekly_gated_rag_lstm_metrics.json`
-- `results/weekly_gated_10k_comparison.csv`
+- `results/weekly_full_lstm/weekly_lstm_predictions.npz`
+- `/Users/fangyan/Downloads/weekly_full_gated_t025_analysis.tar.gz`
+  (SHA-256 `dca7c4dd64c049034e2f3c59e10a87d2ae6e071a0cce0f3c475668ed12f62d8f`)
 - AutoDL `cache/weekly_full_gated_t025/weekly_dtw_top5_b644bb412e5f.npz`
-- AutoDL `results/weekly_full_gated_t025/weekly_gated_rag_lstm_cache.json`
+- AutoDL `results/weekly_full_gated_t025/weekly_gated_rag_lstm_metrics.json`
+- AutoDL `results/weekly_full_gated_t025/weekly_gated_rag_lstm_predictions.npz`
 
 ## Experiment Contracts
 
