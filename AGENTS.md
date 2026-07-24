@@ -22,7 +22,7 @@ explicit progress-sync task, never silently during read-only work.
 
 ## Current Handoff
 
-- **Last material handoff update:** 2026-07-24 22:59 CST
+- **Last material handoff update:** 2026-07-24 23:15 CST
 - **Stage:** Stage 4 - Full M4 Weekly experiment
 - **Status:** Completed; the verified full gated-future result is worse than
   the full plain-LSTM baseline on both primary metrics
@@ -34,10 +34,10 @@ explicit progress-sync task, never silently during read-only work.
   and scored SMAPE/MASE `8.8535/2.4228` with learned gate `0.674363`.
   JSON, NPZ, checkpoint, TensorBoard events, and both PNGs are readable and
   mutually consistent.
-- **Recovery risk:** The formal gated result used CUDA while the verified plain
-  baseline used MPS. Their configuration, IDs, targets, and persistence output
-  match, but a same-device rerun remains optional robustness evidence. Do not
-  tune a new gate on the official-test error tail.
+- **Recovery risk:** The formal AutoDL comparison spans CUDA and MPS, but a
+  completed same-device WSL CUDA rerun independently confirms the negative
+  direction. Do not tune a new gate on the official-test error tail. WSL has an
+  unrelated user modification in `steps.md`; preserve it.
 - **Blockers:** None
 
 ### Ordered Actions
@@ -46,15 +46,13 @@ explicit progress-sync task, never silently during read-only work.
    the experiment conclusion or authorize a sample-adaptive gate follow-up.
 2. If authorized, develop and select the adaptive gate only on `train_tail`,
    then freeze it before one official-test evaluation.
-3. Optionally rerun plain and gated on the same CUDA device for robustness;
-   expand to Daily or Monthly only after the Weekly research decision.
+3. Expand to Daily or Monthly only after the Weekly research decision.
 
 ### Verified Milestones
 
 - Weekly data, metrics, plain/history/gated models, retrieval/cache paths, CLI,
-  and required outputs are implemented.
-- The current suite has 45 tests; recorded local/WSL checks and user-provided
-  AutoDL output show passing runs.
+  and required outputs are implemented; the current 45-test suite has recorded
+  passing local/WSL checks.
 - Full plain baseline, 353,270 windows and 20 epochs: SMAPE `8.5460`, MASE
   `2.3428`.
 - Train-tail selection chose temperature `0.25`.
@@ -66,23 +64,25 @@ explicit progress-sync task, never silently during read-only work.
   `0.757354 -> 0.651752` across all 20 epochs.
 - Against plain, gated regresses by `+0.3075` SMAPE and `+0.0800` MASE; it wins
   only `169/359` series by SMAPE and `171/359` by MASE, with positive median
-  deltas. Paired-series bootstrap 95% intervals include zero.
-- Gated-minus-plain and retrieval-prior-minus-plain per-series MASE deltas have
-  correlation `0.9439`, so harmful retrieved futures are the main follow-up
-  signal; official-test targets cannot be used to design the fix.
-- Checkpoint tensors are finite, TensorBoard contains 20 loss points plus all
-  declared metrics/images/configuration, and both standalone plots passed
-  decode and visual checks.
+  deltas. Paired-series bootstrap 95% intervals include zero. Per-series MASE
+  regressions correlate `0.9439` with harmful retrieval-prior regressions.
+- The same RTX 3060 WSL rerun completed with exit code `0`: plain scores
+  `8.7357/2.3211` and gated scores `8.9211/2.4942`, confirming regressions of
+  `+0.1854` SMAPE and `+0.1731` MASE without a device confound. Their aligned
+  NPZ arrays, finite checkpoints, and PNG artifacts are readable.
+- AutoDL checkpoint tensors are finite, TensorBoard contains 20 loss points
+  plus all declared metrics/images/configuration, and both standalone plots
+  passed decode and visual checks.
 
 Canonical evidence:
 
 - `results/weekly_full_lstm/weekly_lstm_metrics.json`
-- `results/weekly_full_lstm/weekly_lstm_predictions.npz`
 - `/Users/fangyan/Downloads/weekly_full_gated_t025_analysis.tar.gz`
   (SHA-256 `dca7c4dd64c049034e2f3c59e10a87d2ae6e071a0cce0f3c475668ed12f62d8f`)
 - AutoDL `cache/weekly_full_gated_t025/weekly_dtw_top5_b644bb412e5f.npz`
 - AutoDL `results/weekly_full_gated_t025/weekly_gated_rag_lstm_metrics.json`
-- AutoDL `results/weekly_full_gated_t025/weekly_gated_rag_lstm_predictions.npz`
+- WSL `results/weekly_full_lstm_wsl/weekly_lstm_metrics.json`
+- WSL `results/weekly_full_gated_t025_wsl/weekly_gated_rag_lstm_metrics.json`
 
 ## Experiment Contracts
 
